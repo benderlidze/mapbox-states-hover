@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Create a hover effect</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js"></script>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZGdwbHVzZGVzaWduIiwiYSI6ImNsMGhndHJvdjA4aWozZW1xb21tY3VuZGoifQ.R8LGSPakcmmq-FVmRp7_1A';
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v11',
+            center: { lng: -96.14616420271906, lat: 36.45503473797284 },
+            zoom: 3.6,
+            projection: "mercator"
+        });
+        let hoveredPolygonId = null;
+
+        map.on('load', () => {
+
+            Promise.all([
+                fetch('https://docs.mapbox.com/mapbox-gl-js/assets/us_states.geojson').then(res => res.json()),
+                d3.csv('https://docs.google.com/spreadsheets/d/e/2PACX-1vRucjO0_xbz7kJ1akKPzVjmYS9kZedz5duzHTbSMUMxX8DaCQA06MqV1FmMbHej8tBK8FM240qGC4EQ/pub?output=csv')
+            ]).
+                then(([geojson, data]) => {
+                    console.log('geojson', geojson);
+                    console.log('data', data);
+                    geojson.features.forEach(geo => {
+                        const stateData = data.find(d => d.State.toLowerCase() === geo.properties.STATE_NAME.toLowerCase());
+                        if (stateData) {
+                            geo.properties = { ...geo.properties, ...stateData };
+                        } else {
+                            console.warn('state not found', geo.properties.STATE_NAME);
+                        }
+                    });
+                    map.getSource('states').setData(geojson);
+                });
+
+            map.addSource('states', {
+                'type': 'geojson',
+                'data': {
+                    'type': 'FeatureCollection',
+                    'features': []
+                }
+            });
+
+            // ACC II Color 
+            // ACC II Color 
+            // ACC II Color 
+
+            map.addLayer({
+                'id': 'state-fills',
+                'type': 'fill',
+                'source': 'states',
+                'layout': {},
+                'paint': {
+                    'fill-color': ['get', 'ACC II Color'],
+                    'fill-opacity': [
+                        'case',
+                        ['boolean', ['feature-state', 'hover'], false],
+                        1,
+                        0.5
+                    ]
+                }
+            });
+
+            map.addLayer({
+                'id': 'state-borders',
+                'type': 'line',
+                'source': 'states',
+                'layout': {},
+                'paint': {
+                    'line-color': '#627BC1',
+                    'line-width': 1
+                }
+            });
+
+            const popup = new mapboxgl.Popup({
+                closeButton: true,
+                closeOnClick: false
+            });
+
+            map.on('click', 'state-fills', (e) => {
+
+                const mouseCoordinates = e.lngLat;
+                const description = e.features[0].properties;
+                const stateName = description.STATE_NAME;
+                console.log('description', description);
+                popup.setLngLat(mouseCoordinates).setHTML(stateName).addTo(map);
+            });
+
+            map.on('mousemove', 'state-fills', (e) => {
+                map.getCanvas().style.cursor = 'pointer';
+
+                if (e.features.length > 0) {
+                    if (hoveredPolygonId !== null) {
+                        map.setFeatureState(
+                            { source: 'states', id: hoveredPolygonId },
+                            { hover: false }
+                        );
+                    }
+                    hoveredPolygonId = e.features[0].id;
+                    map.setFeatureState(
+                        { source: 'states', id: hoveredPolygonId },
+                        { hover: true }
+                    );
+                }
+            });
+
+            map.on('mouseleave', 'state-fills', () => {
+                if (hoveredPolygonId !== null) {
+                    map.setFeatureState(
+                        { source: 'states', id: hoveredPolygonId },
+                        { hover: false }
+                    );
+                }
+                hoveredPolygonId = null;
+
+            });
+
+
+        });
+    </script>
+
+</body>
+
+</html>
